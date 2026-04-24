@@ -19,11 +19,16 @@ set -euo pipefail
 # Прочитать команду из stdin (JSON)
 INPUT=$(cat)
 
-# Извлечь непосредственно команду (grep+sed, без зависимости от jq)
-CMD=$(echo "$INPUT" | grep -o '"command"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | sed 's/.*"command"[[:space:]]*:[[:space:]]*"\(.*\)"/\1/')
+# Требуем jq — парсинг regex'ом ломается на командах с кавычками внутри
+if ! command -v jq >/dev/null 2>&1; then
+    echo "⚠️ bash-firewall: jq не найден, пропускаю проверку" >&2
+    exit 0
+fi
+
+CMD=$(printf '%s' "$INPUT" | jq -r '.tool_input.command // ""')
 
 if [ -z "$CMD" ]; then
-    # Не смогли распарсить — пропускаем, чтобы не блокировать работу
+    # Не смогли распарсить или команда пустая — пропускаем, чтобы не блокировать работу
     exit 0
 fi
 
